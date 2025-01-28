@@ -117,8 +117,14 @@ if sys.platform == 'darwin':
   else:
     platform_dependent_packages.append('onnxruntime')
 else:
-  platform_dependent_packages.append('tensorflow[and-cuda]')
-  platform_dependent_packages.append('onnxruntime-gpu')
+  use_cpu: bool = os.getenv('USE_CPU', '0') == '1'
+
+  if use_cpu:
+    platform_dependent_packages.append('tensorflow')
+    platform_dependent_packages.append('onnxruntime')
+  else:
+    platform_dependent_packages.append('tensorflow[and-cuda]')
+    platform_dependent_packages.append('onnxruntime-gpu')
 
 requirements = [
   'numpy',
