@@ -66,6 +66,23 @@ def _media2feats(medianame, tmpdir, start_sec, stop_sec, ffmpeg):
 
     return mspec, loge, difflen
 
+
+def _ndarray2feats(audio):
+    with warnings.catch_warnings():
+        # ignore warnings resulting from empty signals parts
+        warnings.filterwarnings('ignore', message='divide by zero encountered in log', category=RuntimeWarning)
+        _, loge, _, mspec = mfcc(audio.astype(np.float32), get_mspec=True)
+
+    # Management of short duration segments
+    difflen = 0
+    if len(loge) < 68:
+        difflen = 68 - len(loge)
+        warnings.warn("audio duration is short. Robust results require length of at least 720 milliseconds")
+        mspec = np.concatenate((mspec, np.ones((difflen, 24)) * np.min(mspec)))
+
+    return mspec, loge, difflen
+
+
 def _energy_activity(loge, ratio):
     threshold = np.mean(loge[np.isfinite(loge)]) + np.log(ratio)
     raw_activity = (loge > threshold)
@@ -275,23 +292,27 @@ class Segmenter:
 
         return [(lab, start_sec + start * .02, start_sec + stop * .02) for lab, start, stop in lseg]
 
-
-    def __call__(self, medianame, tmpdir=None, start_sec=None, stop_sec=None):
+    def __call__(self, audio: str | np.ndarray, tmpdir=None, start_sec=None, stop_sec=None):
         """
         Return segmentation of a given file
                 * convert file to wav 16k mono with ffmpeg
                 * call NN segmentation procedures
-        * media_name: path to the media to be processed (including remote url)
-                may include any format supported by ffmpeg
+        * audio: path to the media to be processed (including remote url)
+                may include any format supported by ffmpeg OR numpy array
         * tmpdir: allow to define a custom path for storing temporary files
                 fast read/write HD are a good choice
         * start_sec (seconds): sound stream before start_sec won't be processed
         * stop_sec (seconds): sound stream after stop_sec won't be processed
         """
-        
-        mspec, loge, difflen = _media2feats(medianame, tmpdir, start_sec, stop_sec, self.ffmpeg)
-        if start_sec is None:
-            start_sec = 0
+
+        if isinstance(audio, str):
+            mspec, loge, difflen = _media2feats(audio, tmpdir, start_sec, stop_sec, self.ffmpeg)
+            if start_sec is None:
+                start_sec = 0
+        elif isinstance(audio, np.ndarray):
+            mspec, loge, difflen = _ndarray2feats(audio)
+            if start_sec is None:
+                start_sec = 0
         # do segmentation   
         return self.segment_feats(mspec, loge, difflen, start_sec)
 
