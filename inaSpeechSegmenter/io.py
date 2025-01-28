@@ -74,7 +74,7 @@ def media2sig16kmono(medianame, tmpdir=None, start_sec=None, stop_sec=None, ffmp
         output, error = p.communicate()
         assert p.returncode == 0, error
 
-        # Get Mel Power Spectrogram and Energy
+        # Read the temporary WAV file and return the signal.
         sig, sr = sf.read(tmpwav, dtype=dtype)
         assert sr == 16000
         return sig
